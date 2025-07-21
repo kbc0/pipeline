@@ -1,6 +1,43 @@
-# Jenkins ve SonarQube Integration Setup
+# Jenkins CI/CD Pipeline with Security Governance
 
-## 1. Container Durumları Kontrol Etme
+## ✅ Current Status (Working PoC)
+1. **Local CI Stack Running**
+   - Jenkins LTS, SonarQube Community, PostgreSQL via docker-compose
+   - Persistent data volumes (jenkins_home, sonar_*)
+
+2. **Java Reference Pipeline (java-app)**
+   - Stages: Checkout → Maven build → Unit Tests → JaCoCo coverage → SonarQube scan
+   - Quality Gate enforcement with `waitForQualityGate()`
+   - Build fails if quality gate fails
+
+3. **Jenkins ⇄ SonarQube Integration**
+   - Jenkins passes build URL to SonarQube: `-Dsonar.links.ci=${BUILD_URL}`
+   - SonarQube webhook sends gate results back to Jenkins
+
+## 🚧 Next Phase: Security Governance Layer
+
+### A. Shared Pipeline Library (Priority: HIGH)
+- Create reusable security scanning functions
+- Enforce mandatory SonarQube stage (cannot be deleted)
+- Functions: `sonarStage()`, `fortifyScan()`, `blackduckScan()`, `twistlockScan()`
+
+### B. Security Scanners Integration
+- Fortify, BlackDuck, Twistlock containers/SaaS
+- Fail builds on critical findings before deploy
+
+### C. Python SonarQube Watcher Service
+- Poll SonarQube API for projects
+- Clone repos, parse Jenkinsfiles
+- Alert on missing/disabled security stages
+- Slack/Teams notifications + Prometheus metrics
+
+### D. Artifactory Deploy & Governance
+- Deploy only on `currentBuild.result == 'SUCCESS'`
+- Publish artifacts with build metadata
+
+---
+
+## 1. Container Status Check
 ```bash
 docker compose ps
 ```

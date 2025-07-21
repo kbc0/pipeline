@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven3'
+        maven 'Maven3'      // Global Tool Configuration’daki adlar
         jdk   'Java'
     }
 
@@ -12,25 +12,31 @@ pipeline {
 
     stages {
 
-        /* Declarative Pipeline checkout’u zaten yaptı,
-           ekstra checkout stage’ine gerek yok. */
         stage('Build + Test + Sonar') {
             steps {
-                dir('java-app') {                        // <‑‑ POM klasörü
+                dir('java-app') {               // pom.xml burada
                     withMaven(maven: 'Maven3') {
+
+                        // Derle + test
                         sh 'mvn clean test'
 
-                        sh """
-                          mvn sonar:sonar \
-                            -Dsonar.projectKey=java-app \
-                            -Dsonar.links.ci=${JENKINS_URL}
-                        """
+                        // SonarQube analizi – URL ve token’ı env olarak enjekte eder
+                        withSonarQubeEnv('SonarQubeServer') {
+                            sh """
+                               mvn sonar:sonar \
+                                 -Dsonar.projectKey=java-app \
+                                 -Dsonar.projectName='Java App' \
+                                 -Dsonar.links.ci=${JENKINS_URL}
+                            """
+                        }
                     }
                 }
             }
             post {
                 always {
                     junit 'java-app/target/surefire-reports/*.xml'
+
+                    /* HTML Publisher eklentisini kurduktan sonra çalışır */
                     publishHTML(
                         allowMissing: false,
                         alwaysLinkToLastBuild: true,
@@ -46,7 +52,7 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 script {
-                    timeout(time: 1, unit: 'MINUTES') {
+                    timeout(time: 3, unit: 'MINUTES') {
                         def qg = waitForQualityGate()
                         if (qg.status != 'OK') {
                             error "Quality gate failed: ${qg.status}"
@@ -57,5 +63,7 @@ pipeline {
         }
     }
 
-    post { always { cleanWs() } }
+    post {
+        always { cleanWs() }
+    }
 }

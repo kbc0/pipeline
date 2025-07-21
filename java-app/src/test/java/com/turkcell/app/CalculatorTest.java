@@ -36,6 +36,7 @@ public class CalculatorTest {
     
     @Test
     public void testDivide() {
+        
         assertEquals(2, calculator.divide(6, 3));
         assertEquals(-2, calculator.divide(-6, 3));
     }

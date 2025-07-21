@@ -1,0 +1,78 @@
+pipeline {
+    agent any
+    
+    environment {
+        JENKINS_URL = "${BUILD_URL}"
+        SONAR_HOST_URL = 'http://host.docker.internal:9000'
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    echo "Building from Jenkins URL: ${JENKINS_URL}"
+                }
+            }
+        }
+        
+        stage('Build') {
+            steps {
+                sh 'mvn clean compile'
+            }
+        }
+        
+        stage('Unit Tests') {
+            steps {
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    junit 'target/surefire-reports/*.xml'
+                    publishHTML([
+                        allowMissing: false,
+                        alwaysLinkToLastBuild: true,
+                        keepAll: true,
+                        reportDir: 'target/site/jacoco',
+                        reportFiles: 'index.html',
+                        reportName: 'JaCoCo Coverage Report'
+                    ])
+                }
+            }
+        }
+        
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    withSonarQubeEnv('SonarQube') {
+    sh """
+        mvn sonar:sonar \
+          -Dsonar.projectKey=java-app \
+          -Dsonar.projectName='Java App' \
+          -Dsonar.analysis.jenkinsUrl=${JENKINS_URL} \
+          -Dsonar.links.ci=${JENKINS_URL}
+    """
+}
+                }
+            }
+        }
+        
+        stage('Quality Gate') {
+            steps {
+                script {
+                    timeout(time: 1, unit: 'HOURS') {
+                        def qg = waitForQualityGate()
+                        if (qg.status != 'OK') {
+                            error "Pipeline aborted due to quality gate failure: ${qg.status}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

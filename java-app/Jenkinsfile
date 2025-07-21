@@ -1,8 +1,6 @@
 pipeline {
     agent any
 
-    /* Jenkins → Global Tool Configuration’da
-       Maven = “Maven3”,  JDK = “Java” olarak tanımlı */
     tools {
         maven 'Maven3'
         jdk   'Java'
@@ -14,36 +12,30 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
-            steps {
-                checkout scm                    // repo'dan kodu al
-                echo "Building from ${JENKINS_URL}"
-            }
-        }
-
-        /* withMaven → Maven Home’u PATH’e ekler;
-           mvn not found hatasını kesin çözer */
+        /* Declarative Pipeline checkout’u zaten yaptı,
+           ekstra checkout stage’ine gerek yok. */
         stage('Build + Test + Sonar') {
             steps {
-                withMaven(maven: 'Maven3') {
-                    sh 'mvn clean test'        // derle + test
+                dir('java-app') {                        // <‑‑ POM klasörü
+                    withMaven(maven: 'Maven3') {
+                        sh 'mvn clean test'
 
-                    sh """
-                       mvn sonar:sonar \
-                         -Dsonar.projectKey=java-app \
-                         -Dsonar.projectName='Java App' \
-                         -Dsonar.links.ci=${JENKINS_URL}
-                    """
+                        sh """
+                          mvn sonar:sonar \
+                            -Dsonar.projectKey=java-app \
+                            -Dsonar.links.ci=${JENKINS_URL}
+                        """
+                    }
                 }
             }
             post {
                 always {
-                    junit 'target/surefire-reports/*.xml'
+                    junit 'java-app/target/surefire-reports/*.xml'
                     publishHTML(
                         allowMissing: false,
                         alwaysLinkToLastBuild: true,
                         keepAll: true,
-                        reportDir: 'target/site/jacoco',
+                        reportDir: 'java-app/target/site/jacoco',
                         reportFiles: 'index.html',
                         reportName: 'JaCoCo Coverage Report'
                     )
@@ -57,7 +49,7 @@ pipeline {
                     timeout(time: 1, unit: 'MINUTES') {
                         def qg = waitForQualityGate()
                         if (qg.status != 'OK') {
-                            error "Pipeline aborted: quality gate = ${qg.status}"
+                            error "Quality gate failed: ${qg.status}"
                         }
                     }
                 }

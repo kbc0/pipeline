@@ -10,6 +10,12 @@ services:
       POSTGRES_DB: sonarqube
     ports:
       - "5433:5432"
+    command: >
+      postgres -c ssl=off
+               -c listen_addresses='*'
+               -c log_statement=all
+               -c max_connections=300
+               -c shared_buffers=256MB
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -32,11 +38,16 @@ services:
   jenkins:
     image: jenkins/jenkins:lts
     container_name: jenkins
+    user: root
     ports:
       - "8080:8080"
       - "50000:50000"
     volumes:
       - jenkins_home:/var/jenkins_home
+    environment:
+      - JAVA_OPTS=-Djenkins.install.runSetupWizard=false
+      - JENKINS_UC=https://updates.jenkins.io
+      - JENKINS_UC_EXPERIMENTAL=https://updates.jenkins.io/experimental
 
 volumes:
   postgres_data:

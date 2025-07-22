@@ -2,31 +2,31 @@ pipeline {
     agent any
 
     tools {
-        maven 'Maven3'      // Global Tool Configuration’daki adlar
-        jdk   'Java'
+        maven 'Maven3'      // Global Tool Configuration'daki isim
+        jdk   'Java'        // Eğer tanımlıysa
     }
 
     environment {
-        JENKINS_URL = "${BUILD_URL}"
+        JENKINS_URL = "${BUILD_URL}"  // Job URL'si otomatik atanır
     }
 
     stages {
 
-        stage('Build + Test + Sonar') {
+        stage('Build + Test + Sonar') {
             steps {
-                dir('java-app') {               // pom.xml burada
+                dir('java-app') {
                     withMaven(maven: 'Maven3') {
 
-                        // Derle + test
+                        // Derleme ve test
                         sh 'mvn clean test'
 
-                        // SonarQube analizi – URL ve token’ı env olarak enjekte eder
+                        // SonarQube analiz + Jenkins URL bağlantısı
                         withSonarQubeEnv('SonarQubeServer') {
                             sh """
-                               mvn sonar:sonar \
-                                 -Dsonar.projectKey=java-app \
-                                 -Dsonar.projectName='Java App' \
-                                 -Dsonar.links.ci=${JENKINS_URL}
+                                mvn sonar:sonar \
+                                  -Dsonar.projectKey=java-app \
+                                  -Dsonar.projectName='Java App' \
+                                  -Dsonar.links.ci=${JENKINS_URL}
                             """
                         }
                     }
@@ -34,22 +34,23 @@ pipeline {
             }
             post {
                 always {
+                    // Test raporu (JUnit)
                     junit 'java-app/target/surefire-reports/*.xml'
 
-                    /* HTML Publisher eklentisini kurduktan sonra çalışır */
-                    publishHTML(
+                    // Coverage raporu (varsayım: JaCoCo yüklü)
+                    publishHTML([
                         allowMissing: false,
                         alwaysLinkToLastBuild: true,
                         keepAll: true,
                         reportDir: 'java-app/target/site/jacoco',
                         reportFiles: 'index.html',
-                        reportName: 'JaCoCo Coverage Report'
-                    )
+                        reportName: 'JaCoCo Coverage Report'
+                    ])
                 }
             }
         }
 
-        stage('Quality Gate') {
+        stage('Quality Gate') {
             steps {
                 script {
                     timeout(time: 3, unit: 'MINUTES') {
@@ -64,6 +65,8 @@ pipeline {
     }
 
     post {
-        always { cleanWs() }
+        always {
+            cleanWs()
+        }
     }
 }
